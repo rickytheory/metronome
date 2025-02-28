@@ -1,24 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Metronome
+
+A modern, interactive metronome web application built with Next.js and React. Features include:
+
+- Classical tempo markings (Largo to Presto)
+- Multiple time signatures (2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8)
+- Visual beat indicators
+- Volume control
+- Tap tempo functionality
+- Easter egg tempo game - can you reach "You Win!"?
 
 ## Getting Started
 
-First, run the development server:
+First, install the dependencies:
+
+```bash
+npm install
+```
+
+Then, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Building for Production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+To create a production build:
+
+```bash
+npm run build
+```
+
+For static hosting:
+
+```bash
+npm run build:static
+```
+
+## Technologies Used
+
+- Next.js 15.2
+- React 19
+- TypeScript
+- Tailwind CSS
+- Web Audio API
+- Canvas Confetti
 
 ## Learn More
 
