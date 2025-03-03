@@ -1,5 +1,6 @@
 "use client";
 
+import React, { ReactElement } from "react";
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -10,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import confetti from 'canvas-confetti';
+import confetti from "canvas-confetti";
 
 // Sound parameters
 const SOUNDS = {
@@ -34,7 +35,7 @@ const ENVELOPE = {
 
 interface TimeSignature {
   beats: number;
-  value: "4" | "8";  // denominator of time signature
+  value: "4" | "8"; // denominator of time signature
 }
 
 // Add a constant to help organize our time signatures
@@ -72,41 +73,43 @@ const EASTER_EGG_TEMPOS = [
 const getTempoName = (tempo: number) => {
   // Check easter egg tempos first
   const easterEggTempo = EASTER_EGG_TEMPOS.find(
-    mark => tempo >= mark.min && tempo <= mark.max
+    (mark) => tempo >= mark.min && tempo <= mark.max
   );
   if (easterEggTempo) return easterEggTempo.name;
 
   // Fall back to regular tempo marks
-  return TEMPO_MARKS.find(mark => 
-    mark.tempo >= tempo)?.name || TEMPO_MARKS[TEMPO_MARKS.length - 1].name;
+  return (
+    TEMPO_MARKS.find((mark) => mark.tempo >= tempo)?.name ||
+    TEMPO_MARKS[TEMPO_MARKS.length - 1].name
+  );
 };
 
 // Helper function to get color based on tempo
 const getTempoColor = (tempo: number) => {
-  if (tempo <= 208) return 'inherit';
-  if (tempo >= 550) return '#FF3333'; // Bright hot red
-  
+  if (tempo <= 208) return "inherit";
+  if (tempo >= 550) return "#FF3333"; // Bright hot red
+
   // Calculate how "hot" the tempo is between 208 and 550
   const hotness = (tempo - 208) / (550 - 208);
-  
+
   // Start from black and gradually increase red, then make it brighter
   const red = Math.round(255 * hotness);
   // Add a small amount of green/blue for the glow effect at higher temps
   // const greenBlue = Math.round(51 * Math.max(0, hotness - 0.8));
   const greenBlue = 0;
-  
+
   return `rgb(${red}, ${greenBlue}, ${greenBlue})`;
 };
 
 // Helper function to get font size based on tempo
 const getTempoSize = (tempo: number) => {
-  if (tempo <= 208) return '2.25rem'; // text-4xl default
-  if (tempo >= 550) return '4rem';
-  
+  if (tempo <= 208) return "2.25rem"; // text-4xl default
+  if (tempo >= 550) return "4rem";
+
   // Calculate size increase between 208 and 550
   const scale = (tempo - 208) / (550 - 208);
-  const size = 2.25 + (scale * 1.75); // Scale from 2.25rem to 4rem
-  
+  const size = 2.25 + scale * 1.75; // Scale from 2.25rem to 4rem
+
   return `${size}rem`;
 };
 
@@ -114,7 +117,10 @@ export function Metronome() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [tempo, setTempo] = useState(120);
   const [volume, setVolume] = useState(0.5);
-  const [timeSignature, setTimeSignature] = useState<TimeSignature>({ beats: 4, value: "4" });
+  const [timeSignature, setTimeSignature] = useState<TimeSignature>({
+    beats: 4,
+    value: "4",
+  });
   const [currentBeat, setCurrentBeat] = useState(0);
   const [hasWon, setHasWon] = useState(false);
   const [showVictoryBanner, setShowVictoryBanner] = useState(false);
@@ -125,7 +131,8 @@ export function Metronome() {
   const nextBeatRef = useRef(0);
   const tempoRef = useRef(tempo);
   const volumeRef = useRef(volume);
-  
+  const isFirstClickRef = useRef(true);
+
   // Tap tempo refs
   const tapTimesRef = useRef<number[]>([]);
   const tapTimeoutRef = useRef<number | null>(null);
@@ -134,7 +141,7 @@ export function Metronome() {
   const ensureAudioContext = () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext();
-    } else if (audioContextRef.current.state === 'suspended') {
+    } else if (audioContextRef.current.state === "suspended") {
       audioContextRef.current.resume();
     }
   };
@@ -200,22 +207,12 @@ export function Metronome() {
     oscillator.stop(now + ENVELOPE.attack + ENVELOPE.decay + ENVELOPE.release);
   };
 
-  // Calculate effective tempo based on time signature
-  const getEffectiveTempo = () => {
-    // For eighth note time signatures, double the tempo
-    const actualTempo = timeSignature.value === "8" ? tempoRef.current * 2 : tempoRef.current;
-    
-    // No longer capping the tempo, allowing for easter egg speeds
-    return actualTempo;
-  };
-
   const startMetronome = () => {
     if (timerRef.current) clearInterval(timerRef.current);
-    
-    const effectiveTempo = getEffectiveTempo();
+
     // Add a safety check to prevent extremely fast intervals that could crash the browser
-    const intervalMs = Math.max((60 / effectiveTempo) * 1000, 10); // Minimum 10ms interval
-    
+    const intervalMs = Math.max((60 / tempoRef.current) * 1000, 10); // Minimum 10ms interval
+
     // Play the first beat immediately
     playClick(nextBeatRef.current);
     setCurrentBeat(nextBeatRef.current);
@@ -231,7 +228,7 @@ export function Metronome() {
 
   const startStop = () => {
     ensureAudioContext();
-    
+
     if (isPlaying) {
       if (timerRef.current) clearInterval(timerRef.current);
       setIsPlaying(false);
@@ -241,11 +238,17 @@ export function Metronome() {
       setIsPlaying(true);
       setCurrentBeat(0);
       nextBeatRef.current = 0;
-      
-      // Small delay to ensure AudioContext is ready
-      setTimeout(() => {
+
+      if (isFirstClickRef.current) {
+        // First click after load - use timeout
+        setTimeout(() => {
+          startMetronome();
+        }, 500);
+        isFirstClickRef.current = false;
+      } else {
+        // Subsequent clicks - start immediately
         startMetronome();
-      }, 300);
+      }
     }
   };
 
@@ -288,24 +291,25 @@ export function Metronome() {
       }
 
       // Calculate average interval
-      const averageInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-      
+      const averageInterval =
+        intervals.reduce((a, b) => a + b, 0) / intervals.length;
+
       // Convert to BPM (60000 ms = 1 minute)
       const newTempo = Math.round(60000 / averageInterval);
-      
+
       // Add reasonable limits to prevent unrealistic tempos
       // Most humans can't tap faster than about 800 BPM
       const clampedTempo = Math.min(Math.max(newTempo, 40), 800);
-      
+
       setTempo(clampedTempo);
-      
+
       // If playing, update the metronome timing
       if (isPlaying) {
         // Clear the old timeout to prevent rapid updates
         if (tapTimeoutRef.current) {
           clearTimeout(tapTimeoutRef.current);
         }
-        
+
         // Wait a short moment before updating the metronome to allow for multiple taps
         tapTimeoutRef.current = window.setTimeout(() => {
           startMetronome();
@@ -325,7 +329,7 @@ export function Metronome() {
     if (tempo >= 550 && !hasWon) {
       setHasWon(true);
       setShowVictoryBanner(true);
-      
+
       // Set win lockout
       winLockoutRef.current = window.setTimeout(() => {
         winLockoutRef.current = null;
@@ -337,7 +341,7 @@ export function Metronome() {
       confetti({
         particleCount: 100,
         spread: 70,
-        origin: { y: 0.6 }
+        origin: { y: 0.6 },
       });
       // Add a few more bursts for extra effect
       setTimeout(() => {
@@ -345,7 +349,7 @@ export function Metronome() {
           particleCount: 50,
           angle: 60,
           spread: 55,
-          origin: { x: 0 }
+          origin: { x: 0 },
         });
       }, 200);
       setTimeout(() => {
@@ -353,7 +357,7 @@ export function Metronome() {
           particleCount: 50,
           angle: 120,
           spread: 55,
-          origin: { x: 1 }
+          origin: { x: 1 },
         });
       }, 400);
 
@@ -379,31 +383,28 @@ export function Metronome() {
       <div className="flex flex-col items-center gap-1">
         <div className="h-[6rem] flex items-center justify-center relative">
           {showVictoryBanner && (
-            <div 
+            <div
               className="absolute top-0 left-0 right-0 -translate-y-full bg-green-500 text-white py-2 px-4 rounded-t-lg text-center font-bold animate-bounce"
               style={{
-                animation: 'bounce 0.5s infinite'
+                animation: "bounce 0.5s infinite",
               }}
             >
               YOU WIN!
             </div>
           )}
-          <div 
+          <div
             className="font-bold transition-all duration-200"
             style={{
               fontSize: getTempoSize(tempo),
               color: getTempoColor(tempo),
+              display: "flex",
               // textShadow: tempo > 208 ? `0 0 ${Math.min((tempo - 208) / 10, 20)}px ${getTempoColor(tempo)}` : 'none',
             }}
           >
-            {tempo} BPM
+            {timeSignature.value === "8" && getNoteSVG(8)}
+            {timeSignature.value === "4" && getNoteSVG(4)}= {tempo} BPM
           </div>
         </div>
-        {timeSignature.value === "8" && (
-          <div className="text-sm text-muted-foreground">
-            (playing at {tempo * 2} BPM for eighth notes)
-          </div>
-        )}
       </div>
 
       <div className="w-full max-w-xs space-y-2">
@@ -413,7 +414,7 @@ export function Metronome() {
             variant="outline"
             size="sm"
             onMouseDown={handleTapTempo}
-            onTouchStart={handleTapTempo}
+            // onTouchStart={handleTapTempo}
             className="px-4"
           >
             Tap
@@ -445,29 +446,29 @@ export function Metronome() {
             const [beats, noteValue] = value.split("/");
             const newTimeSignature = {
               beats: parseInt(beats),
-              value: noteValue as "4" | "8"
+              value: noteValue as "4" | "8",
             };
             setTimeSignature(newTimeSignature);
-            
+
             if (isPlaying) {
               // Stop the current interval
               if (timerRef.current) {
                 clearInterval(timerRef.current);
               }
-              
-              // Calculate the new interval based on the new time signature
-              const effectiveTempo = newTimeSignature.value === "8" ? tempoRef.current * 2 : tempoRef.current;
-              const intervalMs = (60 / effectiveTempo) * 1000;
-              
+
+              const intervalMs = (60 / tempoRef.current) * 1000;
+
               // Reset beat counter
               nextBeatRef.current = 0;
               setCurrentBeat(0);
               
+              //TODO let's use the audio API for timings and schedule the audio in advance
               // Start the new interval
               timerRef.current = window.setInterval(() => {
                 playClick(nextBeatRef.current);
                 setCurrentBeat(nextBeatRef.current);
-                nextBeatRef.current = (nextBeatRef.current + 1) % newTimeSignature.beats;
+                nextBeatRef.current =
+                  (nextBeatRef.current + 1) % newTimeSignature.beats;
               }, intervalMs);
             }
           }}
@@ -477,10 +478,7 @@ export function Metronome() {
           </SelectTrigger>
           <SelectContent>
             {TIME_SIGNATURES.map((sig) => (
-              <SelectItem 
-                key={sig.display} 
-                value={sig.display}
-              >
+              <SelectItem key={sig.display} value={sig.display}>
                 {sig.display}
               </SelectItem>
             ))}
@@ -505,6 +503,7 @@ export function Metronome() {
           size="lg"
           onClick={startStop}
           variant={isPlaying ? "destructive" : "default"}
+          // variant={isPlaying ? "destructive" : "default"}
         >
           {isPlaying ? "Stop" : "Start"}
         </Button>
@@ -522,4 +521,39 @@ export function Metronome() {
       </div>
     </div>
   );
+}
+
+function getNoteSVG(notevalue: number) {
+  let thisEl: ReactElement = <></>;
+
+  const note8th: ReactElement = (
+    <svg width="40" height="50" viewBox="35 0 35 100">
+      <path
+        fill="#555"
+        d="M68.893,19.699C62.391,13.182,54.725,7.615,53.008,1.76v70.604c-4.908-6.32-13.438-6.596-20.097-3.447  c-7.548,3.572-13.24,11.873-8.896,20.975c4.303,9.103,14.292,9.963,21.876,6.394c5.892-2.802,10.658-8.478,10.394-15.179V24.743  c9.418,1.418,19.152,11.146,20.777,23.073C78.682,34.936,75.66,26.582,68.893,19.699z"
+      />
+    </svg>
+  );
+
+  const note4: ReactElement = (
+    <svg width="40" height="50" viewBox="40 0 20.0 100">
+      <path
+        fill="#000"
+        d="M63.576,2.553v68.904c-2.951-3.758-7.191-5.355-11.549-5.355c-2.909,0-5.869,0.713-8.53,1.972  c-7.562,3.579-13.265,11.895-8.912,21.012c2.802,5.926,8.009,8.363,13.397,8.363c2.9,0,5.858-0.707,8.518-1.959  c5.727-2.726,10.389-8.158,10.418-14.607h0.006V2.553H63.576z"
+      />
+    </svg>
+  );
+
+  switch (notevalue) {
+    case 8:
+      thisEl = note8th;
+      break;
+    case 4:
+      thisEl = note4;
+      break;
+    default:
+      thisEl = note4;
+      break;
+  }
+  return thisEl;
 }
