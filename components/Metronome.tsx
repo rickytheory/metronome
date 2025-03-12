@@ -180,6 +180,8 @@ export function Metronome() {
   const [volume, setVolume] = useState(0.5);
   const [hasFlashSupport, setHasFlashSupport] = useState(false);
   const [useFlash, setUseFlash] = useState(false);
+  const [hasVibrationSupport, setHasVibrationSupport] = useState(false);
+  const [useVibration, setUseVibration] = useState(false);
   const [timeSignature, setTimeSignature] = useState<TimeSignature>({
     beats: 4,
     value: "4",
@@ -248,48 +250,79 @@ export function Metronome() {
     accentBeatsRef.current = accentBeats;
   }, [accentBeats]);
 
-  // Check for flash support
+  // Check for flash support without requesting permissions
   useEffect(() => {
-    async function checkFlashSupport() {
+    async function checkFlashPossible() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        });
-        const track = stream.getVideoTracks()[0];
-        const capabilities = track.getCapabilities();
-
-        // Store refs for later use
-        mediaStreamRef.current = stream;
-        trackRef.current = track;
-
-        // @ts-expect-error - torch is a valid capability but not in TypeScript types
-        setHasFlashSupport(!!capabilities.torch);
-
-        // Clean up if no flash support
-        // @ts-expect-error - torch is a valid capability but not in TypeScript types
-        if (!capabilities.torch) {
-          track.stop();
-          mediaStreamRef.current = null;
-          trackRef.current = null;
+        // First check if torch is even in supported constraints
+        const constraints = navigator.mediaDevices.getSupportedConstraints();
+        // @ts-expect-error - torch is a valid constraint but not in TypeScript types
+        if (!constraints.torch) {
+          setHasFlashSupport(false);
+          return;
         }
+
+        // Then check if we can enumerate devices without requesting permissions
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasCamera = devices.some(device => device.kind === 'videoinput');
+        setHasFlashSupport(hasCamera);
       } catch (error) {
-        console.log("Flash not supported:", error);
+        console.log("Flash check failed:", error);
         setHasFlashSupport(false);
       }
     }
+    checkFlashPossible();
+  }, []);
 
-    checkFlashSupport();
+  // Check for actual flash support only when user enables the feature
+  const checkFlashSupport = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
 
-    // Cleanup
+      // Store refs for later use
+      mediaStreamRef.current = stream;
+      trackRef.current = track;
+
+      // @ts-expect-error - torch is a valid capability but not in TypeScript types
+      const hasSupport = !!capabilities.torch;
+      
+      // If no actual torch support, clean up
+      if (!hasSupport) {
+        track.stop();
+        mediaStreamRef.current = null;
+        trackRef.current = null;
+        setUseFlash(false);
+      }
+      setHasFlashSupport(hasSupport);
+    } catch (error) {
+      console.log("Flash not supported:", error);
+      setHasFlashSupport(false);
+      setUseFlash(false);
+    }
+  };
+
+  // Effect to handle flash permission and cleanup
+  useEffect(() => {
+    if (useFlash) {
+      checkFlashSupport();
+    }
+
+    // Cleanup function
     return () => {
       if (trackRef.current) {
         trackRef.current.stop();
       }
       if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
       }
+      mediaStreamRef.current = null;
+      trackRef.current = null;
     };
-  }, []);
+  }, [useFlash]);
 
   // Update accent beats when time signature changes
   useEffect(() => {
@@ -325,6 +358,41 @@ export function Metronome() {
     }
   }, [isPlaying, hasFlashSupport]);
 
+  // Check for vibration support
+  useEffect(() => {
+    // More robust check for vibration support
+    const hasSupport = typeof window !== 'undefined' && 
+      'vibrate' in navigator && 
+      typeof navigator.vibrate === 'function' &&
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); // Only enable on mobile devices
+    
+    console.log('Vibration support check:', {
+      hasWindow: typeof window !== 'undefined',
+      hasVibrateProperty: 'vibrate' in navigator,
+      isVibrateFunction: typeof navigator.vibrate === 'function',
+      isMobileDevice: /Android|iPhone|iPad|iPod/i.test(navigator.userAgent),
+      finalResult: hasSupport
+    });
+
+    setHasVibrationSupport(hasSupport);
+  }, []);
+
+  // Function to handle vibration
+  const vibrate = (isAccent: boolean) => {
+    if (!useVibration || !hasVibrationSupport) return;
+    
+    try {
+      if (isAccent) {
+        navigator.vibrate(100); // Longer pulse for downbeat
+      } else {
+        navigator.vibrate(50); // Shorter pulse for other beats
+      }
+    } catch (error) {
+      console.error('Vibration failed:', error);
+      setHasVibrationSupport(false);
+    }
+  };
+
   const playClick = (beatNumber: number) => {
     if (!audioContextRef.current) return;
 
@@ -340,6 +408,9 @@ export function Metronome() {
       ? SOUNDS.accent
       : SOUNDS.otherBeats;
     const beatVolume = volumeRef.current * soundParams.gainMultiplier;
+
+    // Vibrate if enabled
+    vibrate(accentBeatsRef.current[beatNumber]);
 
     // Initial gain
     gainNode.gain.setValueAtTime(0, now);
@@ -413,6 +484,11 @@ export function Metronome() {
 
   const startStop = () => {
     ensureAudioContext();
+
+    // Test vibration on start if enabled
+    if (!isPlaying && useVibration) {
+      vibrate(true);
+    }
 
     if (isPlaying) {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -609,8 +685,8 @@ export function Metronome() {
 
   return (
     <div className="flex flex-col items-center gap-8 p-8 rounded-lg border bg-card text-card-foreground shadow-sm w-[400px]">
-      <div className="w-full flex justify-end">
-        {hasFlashSupport && (
+      <div className="w-full flex justify-end mb-2">
+        {(hasFlashSupport || hasVibrationSupport) && (
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -621,15 +697,48 @@ export function Metronome() {
               <DialogHeader>
                 <DialogTitle>Settings</DialogTitle>
               </DialogHeader>
-              <div className="flex items-center justify-between py-4">
-                <label className="text-sm font-medium">Flash on Beat</label>
-                <Switch checked={useFlash} onCheckedChange={setUseFlash} />
+              <div className="flex flex-col gap-4">
+                {hasFlashSupport && (
+                  <div className="flex items-center justify-between py-2">
+                    <label className="text-sm font-medium">Flash on Beat</label>
+                    <Switch 
+                      checked={useFlash} 
+                      onCheckedChange={(checked) => {
+                        setUseFlash(checked);
+                        if (!checked) {
+                          // Clean up flash when disabled
+                          if (trackRef.current) {
+                            trackRef.current.stop();
+                          }
+                          if (mediaStreamRef.current) {
+                            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                          }
+                          mediaStreamRef.current = null;
+                          trackRef.current = null;
+                          setHasFlashSupport(false);
+                        }
+                      }} 
+                    />
+                  </div>
+                )}
+                {hasVibrationSupport && (
+                  <div className="flex items-center justify-between py-2">
+                    <label className="text-sm font-medium">Vibrate on Beat</label>
+                    <Switch 
+                      checked={useVibration} 
+                      onCheckedChange={(checked) => {
+                        console.log('Vibration toggle:', { checked });
+                        setUseVibration(checked);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
         )}
       </div>
-      <div className="flex flex-col items-center gap-1">
+      <div className="flex flex-col items-center gap-1 -mt-4">
         <div className="h-[6rem] flex items-center justify-center relative">
           {showVictoryBanner && (
             <div
