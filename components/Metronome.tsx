@@ -684,7 +684,7 @@ export function Metronome() {
   }, [hasWon, tempo, timeSignature, selectedNoteType]);
 
   return (
-    <div className="flex flex-col items-center gap-8 p-8 rounded-lg border bg-card text-card-foreground shadow-sm w-[400px]">
+    <div className="flex flex-col items-center gap-8 p-4 sm:p-6 rounded-lg border bg-card text-card-foreground shadow-sm w-[min(400px,95vw)]">
       <div className="w-full flex justify-end mb-2">
         {(hasFlashSupport || hasVibrationSupport) && (
           <Dialog>
@@ -715,7 +715,6 @@ export function Metronome() {
                           }
                           mediaStreamRef.current = null;
                           trackRef.current = null;
-                          setHasFlashSupport(false);
                         }
                       }} 
                     />
@@ -808,7 +807,7 @@ export function Metronome() {
         </div>
       </div>
 
-      <div className="w-full max-w-xs space-y-2">
+      <div className="w-full max-w-[min(320px,90vw)] space-y-2">
         <div className="flex justify-between items-center">
           <label className="text-sm font-medium">Tempo</label>
           <Button
@@ -839,7 +838,7 @@ export function Metronome() {
         </div>
       </div>
 
-      <div className="w-full max-w-xs space-y-2">
+      <div className="w-full max-w-[min(320px,90vw)] space-y-2">
         <label className="text-sm font-medium">Time Signature</label>
         <Select
           value={
@@ -912,7 +911,7 @@ export function Metronome() {
         </Select>
       </div>
 
-      <div className="w-full max-w-xs space-y-2">
+      <div className="w-full max-w-[min(320px,90vw)] space-y-2">
         <label className="text-sm font-medium">Volume</label>
         <Slider
           value={[volume]}
